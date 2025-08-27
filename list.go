@@ -211,22 +211,12 @@ func (x XList[T]) DropLastWhile(n XInt, f func(T) bool) XList[T] {
 	return ListDropLastWhile(x, int(n), f)
 }
 
-func (x XList[T]) Partition(partition XInt) XList[XList[T]] {
-	lp := ListPartition(x, int(partition))
-	result := make(XList[XList[T]], len(lp))
-	for i, v := range lp {
-		result[i] = v
-	}
-	return result
+func (x XList[T]) Partition(partition XInt) [][]T {
+	return ListPartition(x, int(partition))
 }
 
-func (x XList[T]) PartitionWithCal(f func(int) int) XList[XList[T]] {
-	lp := ListPartitionWithCal(x, f)
-	result := make(XList[XList[T]], len(lp))
-	for i, v := range lp {
-		result[i] = v
-	}
-	return result
+func (x XList[T]) PartitionWithCal(f func(int) int) [][]T {
+	return ListPartitionWithCal(x, f)
 }
 
 func (x XList[T]) Plus(n []T) XList[T] {
