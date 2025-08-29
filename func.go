@@ -542,7 +542,7 @@ func ListDropLast[T any](list []T, n int) []T {
 	if n == 0 {
 		return list
 	}
-	return list[:n]
+	return list[:len(list)-n]
 }
 
 func ListDropWhile[T any](list []T, n int, predicate func(T) bool) []T {
