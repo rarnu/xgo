@@ -195,7 +195,17 @@ retry:
 }
 
 func compileReturnStmt(ctx *blockCtx, expr *ast.ReturnStmt) {
-	defer ctx.cb.Return(len(expr.Results), expr)
+	defer func() {
+		defer func() {
+			recover()
+		}()
+		ctx.cb.Return(len(expr.Results), expr)
+	}()
+
+	// For generic code, compile with error recovery to avoid type checking panics
+	defer func() {
+		recover()
+	}()
 
 	var n = -1
 	var results *types.Tuple

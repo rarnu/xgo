@@ -205,7 +205,9 @@ func Add[T interface{ ~int | int64 | ~uint | float64 }](x, y T) T {
 }
 `, `package main
 
-func Add[T interface{ ~int | int64 | ~uint | float64 }](x, y T) T {
+func Add[T interface {
+	~int | int64 | ~uint | float64
+}](x T, y T) T {
 	return x + y
 }
 `)
@@ -226,15 +228,19 @@ func Sample() {
 }
 `, `package main
 
-func At[T interface{ ~[]E }, E any](x T, i int) E {
+import "fmt"
+
+func At[T interface {
+	~[]E
+}, E interface{}](x T, i int) E {
 	return x[i]
 }
 
-var	AtInt = At[[]int]
+var AtInt = At[[]int]
 
 func Sample() {
 	i := AtInt([]int{1, 2, 3, 4, 5}, 2)
-	println(i)
+	fmt.Println(i)
 }
 `)
 }

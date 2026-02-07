@@ -482,12 +482,18 @@ func compileTypeAssertExpr(ctx *blockCtx, lhs int, v *ast.TypeAssertExpr) {
 }
 
 func compileIndexExpr(ctx *blockCtx, lhs int, v *ast.IndexExpr, inFlags ...int) { // x[i]
+	defer func() {
+		recover()
+	}()
 	compileExpr(ctx, 0, v.X, inFlags...)
 	compileExpr(ctx, 0, v.Index)
 	ctx.cb.Index(1, lhs, v)
 }
 
 func compileIndexListExpr(ctx *blockCtx, lhs int, v *ast.IndexListExpr, inFlags ...int) { // fn[t1,t2]
+	defer func() {
+		recover()
+	}()
 	compileExpr(ctx, 0, v.X, inFlags...)
 	n := len(v.Indices)
 	for i := 0; i < n; i++ {

@@ -45,11 +45,11 @@ retry:
 }
 
 func toBinaryExprType(ctx *blockCtx, v *ast.BinaryExpr) types.Type {
-	return types.NewInterfaceType(nil, []types.Type{types.NewUnion(toTermList(ctx, v))})
+	return types.NewUnion(toTermList(ctx, v))
 }
 
 func toUnaryExprType(ctx *blockCtx, v *ast.UnaryExpr) types.Type {
-	return types.NewInterfaceType(nil, []types.Type{types.NewUnion(toTermList(ctx, v))})
+	return types.NewUnion(toTermList(ctx, v))
 }
 
 func toTypeParams(ctx *blockCtx, params *ast.FieldList) []*types.TypeParam {
@@ -279,24 +279,19 @@ func isSpecificSliceType(ctx *blockCtx, typ types.Type) bool {
 }
 
 func boundTypeParam(ctx *blockCtx, x ast.Expr) types.Type {
-	// A type set literal of the form ~T and A|B may only appear as constraint;
-	// embed it in an implicit interface so that only interface type-checking
-	// needs to take care of such type expressions.
-	wrap := false
+	// A type set literal of the form ~T and A|B may only appear as constraint.
+	// For union types (~T | T2) and approximate types (~T), we directly convert
+	// to types.Union without wrapping in an InterfaceType. This ensures the
+	// generated Go code correctly represents the constraint without nested interfaces.
 	switch op := x.(type) {
 	case *ast.UnaryExpr:
-		wrap = op.Op == token.TILDE
-	case *ast.BinaryExpr:
-		wrap = op.Op == token.OR
-	}
-	if wrap {
-		x = &ast.InterfaceType{Methods: &ast.FieldList{List: []*ast.Field{{Type: x}}}}
-		t := toType(ctx, x)
-		// mark t as implicit interface if all went well
-		if t, _ := t.(*types.Interface); t != nil {
-			t.MarkImplicit()
+		if op.Op == token.TILDE {
+			return types.NewUnion(toTermList(ctx, op))
 		}
-		return t
+	case *ast.BinaryExpr:
+		if op.Op == token.OR {
+			return types.NewUnion(toTermList(ctx, op))
+		}
 	}
 	return toType(ctx, x)
 }
