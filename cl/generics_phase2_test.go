@@ -147,7 +147,6 @@ type Pair[K comparable, V interface{}] struct {
 func (p *Pair[K, V]) GetKey() K {
 	return p.Key
 }
-
 func (p *Pair[K, V]) GetValue() V {
 	return p.Value
 }

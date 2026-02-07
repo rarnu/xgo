@@ -1580,14 +1580,37 @@ func loadFuncBody(ctx *blockCtx, fn *gogen.Func, body *ast.BlockStmt, sigBase *t
 	cb := fn.BodyStart(ctx.pkg, body)
 	cb.SetComments(nil, false)
 
-	// Set up tlookup for generic function bodies
+	// Set up tlookup for generic function/method bodies
 	sig := fn.Type().(*types.Signature)
-	if typeParams := sig.TypeParams(); typeParams != nil && typeParams.Len() > 0 {
-		tparams := make([]*types.TypeParam, typeParams.Len())
-		for i := 0; i < typeParams.Len(); i++ {
-			tparams[i] = typeParams.At(i)
+
+	var allTypeParams []*types.TypeParam
+
+	// For methods on generic types, use the receiver's original type params
+	// This ensures type parameter identity between struct fields and method body
+	if recv := sig.Recv(); recv != nil {
+		recvType := recv.Type()
+		if pt, ok := recvType.(*types.Pointer); ok {
+			recvType = pt.Elem()
 		}
-		ctx.tlookup = &typeParamLookup{typeParams: tparams}
+		if named, ok := recvType.(*types.Named); ok {
+			if typeParams := named.TypeParams(); typeParams != nil && typeParams.Len() > 0 {
+				for i := 0; i < typeParams.Len(); i++ {
+					allTypeParams = append(allTypeParams, typeParams.At(i))
+				}
+			}
+		}
+	}
+
+	// Add function's own type parameters (for generic functions)
+	if typeParams := sig.TypeParams(); typeParams != nil && typeParams.Len() > 0 {
+		for i := 0; i < typeParams.Len(); i++ {
+			allTypeParams = append(allTypeParams, typeParams.At(i))
+		}
+	}
+
+	// Set up tlookup if there are any type parameters
+	if len(allTypeParams) > 0 {
+		ctx.tlookup = &typeParamLookup{typeParams: allTypeParams}
 		defer func() {
 			ctx.tlookup = nil
 		}()
