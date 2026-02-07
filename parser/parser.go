@@ -1433,8 +1433,24 @@ func (p *parser) parseInterfaceType() *ast.InterfaceType {
 	lbrace := p.expect(token.LBRACE)
 	scope := ast.NewScope(nil) // interface scope
 	var list []*ast.Field
-	for p.tok == token.IDENT {
-		list = append(list, p.parseMethodSpec(scope))
+	for p.tok != token.RBRACE && p.tok != token.EOF {
+		if p.tok == token.IDENT {
+			// Could be method spec or embedded type/union type
+			list = append(list, p.parseMethodSpec(scope))
+		} else if p.tok == token.TILDE {
+			// ~T - approximate type (for type constraints in interfaces)
+			typ := p.tryParseInterfaceTypeElement(scope)
+			if typ != nil {
+				list = append(list, typ)
+				p.expectSemi()
+			} else {
+				// Fall back to parseMethodSpec
+				list = append(list, p.parseMethodSpec(scope))
+			}
+		} else {
+			// For any other token, try parseMethodSpec
+			list = append(list, p.parseMethodSpec(scope))
+		}
 	}
 	rbrace := p.expect(token.RBRACE)
 
@@ -1446,6 +1462,54 @@ func (p *parser) parseInterfaceType() *ast.InterfaceType {
 			Closing: rbrace,
 		},
 	}
+}
+
+// tryParseInterfaceTypeElement tries to parse a type element in an interface.
+// Returns a Field if it's a type element (embedded type or union type), nil otherwise.
+func (p *parser) tryParseInterfaceTypeElement(scope *ast.Scope) *ast.Field {
+	// Save position and token
+	savedPos := p.pos
+	savedTok := p.tok
+
+	// Try to parse as a type
+	typ, result := p.tryIdentOrType(stateType, nil)
+	if result == resultNone {
+		// Not a type, restore and return nil
+		p.pos = savedPos
+		p.tok = savedTok
+		return nil
+	}
+
+	// Check if this is followed by | (union type)
+	if p.tok == token.OR {
+		// Build union type expression: typ | typ | ...
+		types := []ast.Expr{typ}
+		for p.tok == token.OR {
+			p.next() // consume |
+			nextTyp, nextResult := p.tryIdentOrType(stateType, nil)
+			if nextResult == resultNone {
+				// Invalid union type, restore and return nil
+				p.pos = savedPos
+				p.tok = savedTok
+				return nil
+			}
+			types = append(types, nextTyp)
+		}
+
+		// Build right-associative binary tree: ((t1 | t2) | t3) | t4
+		union := types[0]
+		for i := 1; i < len(types); i++ {
+			union = &ast.BinaryExpr{
+				X:  union,
+				Op: token.OR,
+				Y:  types[i],
+			}
+		}
+		typ = union
+	}
+
+	// This is a type element (embedded type in the interface)
+	return &ast.Field{Type: typ}
 }
 
 func (p *parser) parseMapType() *ast.MapType {
@@ -1595,6 +1659,12 @@ func (p *parser) tryIdentOrType(state int, len ast.Expr) (ast.Expr, int) {
 		return p.parseChanType(), resultType
 	case token.LPAREN:
 		return p.parseTupleType()
+	case token.TILDE:
+		// ~T - approximate type (for type constraints in interfaces)
+		pos := p.pos
+		p.next() // consume ~
+		x, _ := p.parseUnaryExpr(0)
+		return &ast.UnaryExpr{OpPos: pos, Op: token.TILDE, X: p.checkExpr(x)}, resultType
 	}
 
 	// no type found
@@ -2714,7 +2784,7 @@ func (p *parser) parseUnaryExpr(flags int) (ast.Expr, int) {
 	}
 
 	switch p.tok {
-	case token.ADD, token.SUB, token.NOT, token.XOR, token.AND:
+	case token.ADD, token.SUB, token.NOT, token.XOR, token.AND, token.TILDE:
 		pos, op := p.pos, p.tok
 		p.next()
 		x, _ := p.parseUnaryExpr(0)

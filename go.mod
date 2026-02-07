@@ -16,4 +16,6 @@ require (
 	golang.org/x/sys v0.29.0 // indirect
 )
 
+replace github.com/goplus/gogen => ./_vendor/github.com/goplus/gogen@v1.20.8
+
 retract v1.1.12

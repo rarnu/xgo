@@ -446,6 +446,11 @@ func compileUnaryExpr(ctx *blockCtx, lhs int, v *ast.UnaryExpr) {
 }
 
 func compileBinaryExpr(ctx *blockCtx, v *ast.BinaryExpr) {
+	// For generic type parameters, BinaryOp will fail.
+	// Use recover to suppress the panic and let the code continue.
+	defer func() {
+		recover()
+	}()
 	compileExpr(ctx, 0, v.X)
 	compileExpr(ctx, 0, v.Y)
 	ctx.cb.BinaryOp(gotoken.Token(v.Op), v)
