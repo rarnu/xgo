@@ -169,8 +169,72 @@ type Number interface {
 	~int | int64 | ~uint | float64
 }
 
-func Add[T Number](x, y T) T {
+func Add[T Number](x T, y T) T {
 	return x + y
+}
+`)
+}
+
+func TestGenericArrayTypeConstraintDefineXGo(t *testing.T) {
+	gopClTest(t, `package main
+
+type ArrayType[E any] interface {
+	~[]E
+}
+
+func At[T ArrayType[E], E any](x T, i int) E {
+	return x[i]
+}
+`, `package main
+
+type ArrayType[E interface{}] interface {
+	~[]E
+}
+
+func At[T ArrayType[E], E any](x T, i int) E {
+	return x[i]
+}
+`)
+}
+
+func TestGenericMethodConstraintDefineXGo(t *testing.T) {
+	gopClTest(t, `package main
+
+func Add[T interface{ ~int | int64 | ~uint | float64 }](x, y T) T {
+	return x + y
+}
+`, `package main
+
+func Add[T interface{ ~int | int64 | ~uint | float64 }](x, y T) T {
+	return x + y
+}
+`)
+}
+
+func TestGenericMethodConstraintDefineXGO(t *testing.T) {
+	gopClTest(t, `package main
+
+func At[T interface{ ~[]E }, E any](x T, i int) E {
+	return x[i]
+}
+
+var	AtInt = At[[]int]
+
+func Sample() {
+	i := AtInt([1,2,3,4,5], 2)
+	println(i)
+}
+`, `package main
+
+func At[T interface{ ~[]E }, E any](x T, i int) E {
+	return x[i]
+}
+
+var	AtInt = At[[]int]
+
+func Sample() {
+	i := AtInt([]int{1, 2, 3, 4, 5}, 2)
+	println(i)
 }
 `)
 }
