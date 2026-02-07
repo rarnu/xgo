@@ -1029,6 +1029,8 @@ scanAgain:
 			insertSemi = true
 		case '$':
 			tok = token.ENV
+		case '~':
+			tok = token.TILDE
 		default:
 			// next reports unexpected BOMs - don't repeat
 			if ch != bom {

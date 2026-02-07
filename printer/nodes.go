@@ -1026,6 +1026,28 @@ func (p *printer) expr1(expr ast.Expr, prec1, depth int) {
 
 	case *ast.FuncType:
 		p.print(token.FUNC)
+		// Print generic type parameters if present
+		if x.TypeParams != nil {
+			p.print(token.LBRACK)
+			for i, field := range x.TypeParams.List {
+				if i > 0 {
+					p.print(token.COMMA, blank)
+				}
+				// Print parameter names
+				for j, name := range field.Names {
+					if j > 0 {
+						p.print(token.COMMA, blank)
+					}
+					p.expr(name)
+				}
+				// Print constraint if not "any"
+				if ident, isIdent := field.Type.(*ast.Ident); !isIdent || ident.Name != "any" {
+					p.print(blank)
+					p.expr(field.Type)
+				}
+			}
+			p.print(token.RBRACK)
+		}
 		p.signature(x.Params, x.Results)
 
 	case *ast.InterfaceType:
@@ -1805,6 +1827,28 @@ func (p *printer) spec(spec ast.Spec, n int, doIndent bool) {
 	case *ast.TypeSpec:
 		p.setComment(s.Doc)
 		p.expr(s.Name)
+		// Print generic type parameters if present
+		if s.TypeParams != nil {
+			p.print(token.LBRACK)
+			for i, field := range s.TypeParams.List {
+				if i > 0 {
+					p.print(token.COMMA, blank)
+				}
+				// Print parameter names
+				for j, name := range field.Names {
+					if j > 0 {
+						p.print(token.COMMA, blank)
+					}
+					p.expr(name)
+				}
+				// Print constraint if not "any"
+				if ident, isIdent := field.Type.(*ast.Ident); !isIdent || ident.Name != "any" {
+					p.print(blank)
+					p.expr(field.Type)
+				}
+			}
+			p.print(token.RBRACK)
+		}
 		if n == 1 {
 			p.print(blank)
 		} else {
@@ -2085,6 +2129,28 @@ func (p *printer) funcDecl(d *ast.FuncDecl) {
 	p.expr(d.Name)
 	if d.Operator && d.Recv != nil {
 		p.print(blank)
+	}
+	// Print generic type parameters if present
+	if d.Type.TypeParams != nil {
+		p.print(token.LBRACK)
+		for i, field := range d.Type.TypeParams.List {
+			if i > 0 {
+				p.print(token.COMMA, blank)
+			}
+			// Print parameter names
+			for j, name := range field.Names {
+				if j > 0 {
+					p.print(token.COMMA, blank)
+				}
+				p.expr(name)
+			}
+			// Print constraint if not "any"
+			if ident, isIdent := field.Type.(*ast.Ident); !isIdent || ident.Name != "any" {
+				p.print(blank)
+				p.expr(field.Type)
+			}
+		}
+		p.print(token.RBRACK)
 	}
 	p.signature(d.Type.Params, d.Type.Results)
 	p.funcBody(p.distanceFrom(d.Pos(), startCol), vtab, d.Body)

@@ -1376,11 +1376,24 @@ func (p *parser) parseFuncType() (*ast.FuncType, *ast.Scope) {
 		defer un(trace(p, "FuncType"))
 	}
 
-	pos := p.expect(token.FUNC)
+	// If already at FUNC, consume it; otherwise assume it was already consumed
+	var pos token.Pos
+	if p.tok == token.FUNC {
+		pos = p.expect(token.FUNC)
+	} else {
+		pos = token.NoPos
+	}
 	scope := ast.NewScope(p.topScope) // function scope
+
+	// Parse generic type parameters if present: func[T any](...)
+	var typeParams *ast.FieldList
+	if p.tok == token.LBRACK && p.isTypeParamList() {
+		typeParams = p.parseTypeParamList()
+	}
+
 	params, results := p.parseSignature(scope)
 
-	return &ast.FuncType{Func: pos, Params: params, Results: results}, scope
+	return &ast.FuncType{Func: pos, TypeParams: typeParams, Params: params, Results: results}, scope
 }
 
 func (p *parser) parseMethodSpec(scope *ast.Scope) *ast.Field {
@@ -3966,6 +3979,12 @@ func (p *parser) parseTypeSpec(doc *ast.CommentGroup, _ token.Token, _ int) ast.
 	// (Global identifiers are resolved in a separate phase after parsing.)
 	spec := &ast.TypeSpec{Doc: doc, Name: ident}
 	p.declare(spec, nil, p.topScope, ast.Typ, ident)
+
+	// Parse generic type parameters if present: type Name[T, V any] struct { ... }
+	if p.tok == token.LBRACK && p.isTypeParamList() {
+		spec.TypeParams = p.parseTypeParamList()
+	}
+
 	if p.tok == token.ASSIGN {
 		spec.Assign = p.pos
 		p.next()
@@ -3975,6 +3994,69 @@ func (p *parser) parseTypeSpec(doc *ast.CommentGroup, _ token.Token, _ int) ast.
 	spec.Comment = p.lineComment
 
 	return spec
+}
+
+func (p *parser) parseTypeParamList() *ast.FieldList {
+	if p.trace {
+		defer un(trace(p, "TypeParamList"))
+	}
+
+	lbrack := p.expect(token.LBRACK)
+	var list []*ast.Field
+
+	for p.tok != token.RBRACK && p.tok != token.EOF {
+		// Parse type parameter name (identifier)
+		paramName := p.parseIdent()
+
+		// Parse optional constraint
+		var constraint ast.Expr
+		if p.tok != token.COMMA && p.tok != token.RBRACK {
+			constraint = p.parseType()
+		} else {
+			// Default constraint is any (interface{})
+			constraint = &ast.Ident{NamePos: p.pos, Name: "any"}
+		}
+
+		field := &ast.Field{
+			Names: []*ast.Ident{paramName},
+			Type:  constraint,
+		}
+		list = append(list, field)
+
+		if p.tok == token.COMMA {
+			p.next()
+		}
+	}
+
+	rbrack := p.expect(token.RBRACK)
+
+	return &ast.FieldList{
+		Opening: lbrack,
+		List:    list,
+		Closing: rbrack,
+	}
+}
+
+func (p *parser) isTypeParamList() bool {
+	if p.tok != token.LBRACK {
+		return false
+	}
+
+	// Save the current state (LBRACK) for restoration
+	savedPos := p.pos
+	savedTok := p.tok
+	savedLit := p.lit
+
+	// Advance to peek at the next token
+	p.next()
+
+	// After '[', type parameters start with an IDENT (the parameter name)
+	result := p.tok == token.IDENT
+
+	// Restore state
+	p.unget(savedPos, savedTok, savedLit)
+
+	return result
 }
 
 func (p *parser) parseGenDecl(keyword token.Token, f parseSpecFunction) *ast.GenDecl {
@@ -4084,6 +4166,7 @@ func (p *parser) parseFuncDeclOrCall() (ast.Decl, *ast.CallExpr) {
 
 	var recv, params, results *ast.FieldList
 	var ident *ast.Ident
+	var typ *ast.FuncType
 	var isOp, isStatic, isFunLit, ok bool
 
 	switch p.tok {
@@ -4181,7 +4264,13 @@ func (p *parser) parseFuncDeclOrCall() (ast.Decl, *ast.CallExpr) {
 				isStatic = true
 			}
 		}
-		params, results = p.parseSignature(scope)
+		// Parse function type (including type parameters if present)
+		newTyp, scope2 := p.parseFuncType()
+		typ = newTyp
+		params, results = typ.Params, typ.Results
+		if typ.TypeParams != nil {
+			scope = scope2
+		}
 	}
 
 	if isOp {
@@ -4204,16 +4293,19 @@ func (p *parser) parseFuncDeclOrCall() (ast.Decl, *ast.CallExpr) {
 	} else {
 		p.expectSemi()
 	}
-
-	decl := &ast.FuncDecl{
-		Doc:  doc,
-		Recv: recv,
-		Name: ident,
-		Type: &ast.FuncType{
+	if typ == nil {
+		typ = &ast.FuncType{
 			Func:    pos,
 			Params:  params,
 			Results: results,
-		},
+		}
+	}
+
+	decl := &ast.FuncDecl{
+		Doc:      doc,
+		Recv:     recv,
+		Name:     ident,
+		Type:     typ,
 		Body:     body,
 		Operator: isOp,
 		Static:   isStatic,

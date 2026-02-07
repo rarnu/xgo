@@ -1157,7 +1157,21 @@ func preloadFile(p *gogen.Package, ctx *blockCtx, f *ast.File, goFile string, ge
 								if debugLoad {
 									log.Println("==> Load > InitType", name)
 								}
-								decl.InitType(ctx.pkg, toType(ctx, t.Type))
+								// Handle generic types in XGo - set up tlookup for type parameters
+								var typeParams []*types.TypeParam
+								if t.TypeParams != nil {
+									typeParams = toTypeParams(ctx, t.TypeParams)
+									ctx.tlookup = &typeParamLookup{typeParams}
+									defer func() {
+										ctx.tlookup = nil
+									}()
+								}
+								org := ctx.inInst
+								ctx.inInst = 0
+								defer func() {
+									ctx.inInst = org
+								}()
+								decl.InitType(ctx.pkg, toType(ctx, t.Type), typeParams...)
 								if rec := ctx.recorder(); rec != nil {
 									rec.Def(tName, decl.Type().Obj())
 								}
@@ -1565,6 +1579,20 @@ func shouldCallXGoInit(recv *types.Var) bool {
 func loadFuncBody(ctx *blockCtx, fn *gogen.Func, body *ast.BlockStmt, sigBase *types.Signature, src ast.Node, initClass bool) {
 	cb := fn.BodyStart(ctx.pkg, body)
 	cb.SetComments(nil, false)
+
+	// Set up tlookup for generic function bodies
+	sig := fn.Type().(*types.Signature)
+	if typeParams := sig.TypeParams(); typeParams != nil && typeParams.Len() > 0 {
+		tparams := make([]*types.TypeParam, typeParams.Len())
+		for i := 0; i < typeParams.Len(); i++ {
+			tparams[i] = typeParams.At(i)
+		}
+		ctx.tlookup = &typeParamLookup{typeParams: tparams}
+		defer func() {
+			ctx.tlookup = nil
+		}()
+	}
+
 	if initClass {
 		recv := fn.Type().(*types.Signature).Recv()
 		if shouldCallXGoInit(recv) {
