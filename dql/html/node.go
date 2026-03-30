@@ -21,7 +21,6 @@ import (
 	"unsafe"
 
 	"github.com/goplus/xgo/dql"
-	"github.com/qiniu/x/stringutil"
 	"golang.org/x/net/html"
 )
 
@@ -104,7 +103,7 @@ func (n *Node) HasAttr(name string) bool {
 
 // HasClass returns true if the node has the specified class in its "class" attribute.
 func (n *Node) HasClass(val string) bool {
-	return stringutil.Contains(n.XGo_Attr__0("class"), val)
+	return ClassContains(n.XGo_Attr__0("class"), val)
 }
 
 // IsClass returns true if the node's "class" attribute is exactly equal to the
@@ -133,6 +132,35 @@ func (n *Node) XGo_Attr__1(name string) (string, error) {
 		}
 	}
 	return "", dql.ErrNotFound
+}
+
+// ClassContains checks if the classVal is present in the classAttr string, which
+// is a space-separated list of class names.
+func ClassContains(classAttr, classVal string) bool {
+	n := len(classAttr)
+	m := len(classVal)
+	if m == 0 {
+		return false
+	}
+
+	i := 0
+	for i < n {
+		// Skip whitespace
+		for i < n && classAttr[i] == ' ' {
+			i++
+		}
+		// Mark the start of the current token
+		start := i
+		// Advance to the end of the token
+		for i < n && classAttr[i] != ' ' {
+			i++
+		}
+		// Exact match against classCheck
+		if i-start == m && classAttr[start:i] == classVal {
+			return true
+		}
+	}
+	return false
 }
 
 // -----------------------------------------------------------------------------
