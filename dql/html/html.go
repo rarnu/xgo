@@ -513,6 +513,26 @@ func (p NodeSet) HasAttr(name string) bool {
 	return false
 }
 
+// HasClass returns true if the first node in the NodeSet has the specified class in
+// its "class" attribute.
+func (p NodeSet) HasClass(val string) bool {
+	node, err := p.First()
+	if err == nil {
+		return node.HasClass(val)
+	}
+	return false
+}
+
+// IsClass returns true if the "class" attribute of the first node in the NodeSet
+// is exactly equal to the specified value.
+func (p NodeSet) IsClass(val string) bool {
+	node, err := p.First()
+	if err == nil {
+		return node.IsClass(val)
+	}
+	return false
+}
+
 // XGo_Attr returns the value of the specified attribute from the first node in the
 // NodeSet. It only retrieves the attribute from the first node.
 //   - $name

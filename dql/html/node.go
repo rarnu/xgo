@@ -101,6 +101,25 @@ func (n *Node) HasAttr(name string) bool {
 	return false
 }
 
+// HasClass returns true if the node has the specified class in its "class" attribute.
+func (n *Node) HasClass(val string) bool {
+	class, err := n.XGo_Attr__1("class")
+	if err != nil {
+		return false
+	}
+	return ClassContains(class, val)
+}
+
+// IsClass returns true if the node's "class" attribute is exactly equal to the
+// specified value.
+func (n *Node) IsClass(val string) bool {
+	class, err := n.XGo_Attr__1("class")
+	if err != nil {
+		return false
+	}
+	return class == val
+}
+
 // XGo_Attr returns the value of the specified attribute from the node.
 // If the attribute is not found, it returns an empty string.
 //   - $name
@@ -121,6 +140,35 @@ func (n *Node) XGo_Attr__1(name string) (string, error) {
 		}
 	}
 	return "", dql.ErrNotFound
+}
+
+// ClassContains checks if the classVal is present in the classAttr string, which
+// is a space-separated list of class names.
+func ClassContains(classAttr, classVal string) bool {
+	n := len(classAttr)
+	m := len(classVal)
+	if m == 0 {
+		return false
+	}
+
+	i := 0
+	for i < n {
+		// Skip whitespace
+		for i < n && classAttr[i] == ' ' {
+			i++
+		}
+		// Mark the start of the current token
+		start := i
+		// Advance to the end of the token
+		for i < n && classAttr[i] != ' ' {
+			i++
+		}
+		// Exact match against classCheck
+		if i-start == m && classAttr[start:i] == classVal {
+			return true
+		}
+	}
+	return false
 }
 
 // -----------------------------------------------------------------------------

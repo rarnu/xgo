@@ -46,11 +46,14 @@ Name context:
 - pkgRef.fn(args)      (callExpr)
 - fn(args)             (callExpr)
 - classPkg.fn(args)    (callExpr)
+- self.member          (when clHasSelf)
+- self.method(args)    (when clHasSelf)
 - this.member          (classMember)
 - this.method(args)    (classMember)
 
 Name lookup:
 - local variables
+- $self members (only when clHasSelf)
 - $recv members (only in class files)
 - package globals (variables, constants, types, imported packages etc.)
 - class framework exports (only in class files)
@@ -68,6 +71,7 @@ const (
 	clCommandIdent       // this expr is a command and an ident (eg. mkdir "abc")
 	clIdentInStringLitEx // this expr is an ident in a string extended literal (eg. ${PATH})
 	clInCallExpr
+	clHasSelf // self is available
 )
 
 const (
@@ -101,17 +105,17 @@ func compileIdent(ctx *blockCtx, lhs int, ident *ast.Ident, flags int) (pkg goge
 		}
 	}
 
+	if flags&clHasSelf != 0 { // self.member or self.method(args)
+		if _, self := cb.Scope().LookupParent("self", token.NoPos); self != nil &&
+			tryMember(cb, lhs, self, ident, flags) {
+			return
+		}
+	}
+
 	if ctx.isClass { // in an XGo class file
-		if recv = classRecv(cb); recv != nil {
-			cb.Val(recv)
-			chkFlag := flags
-			if chkFlag&clIdentSelectorExpr != 0 { // TODO(xsw): remove this condition
-				chkFlag = clIdentCanAutoCall
-			}
-			if compileMember(ctx, lhs, ident, name, chkFlag) == nil { // class member object
-				return
-			}
-			cb.InternalStack().PopN(1)
+		if recv = classRecv(cb); recv != nil &&
+			tryMember(cb, lhs, recv, ident, flags) {
+			return
 		}
 	}
 
@@ -182,6 +186,19 @@ find:
 		rec.recordIdent(ident, o)
 	}
 	return
+}
+
+func tryMember(cb *gogen.CodeBuilder, lhs int, recv types.Object, ident *ast.Ident, flags int) bool {
+	cb.Val(recv)
+	chkFlag := flags
+	if chkFlag&clIdentSelectorExpr != 0 { // TODO(xsw): remove this condition
+		chkFlag = clIdentCanAutoCall
+	}
+	if compileMember(cb, lhs, ident, ident.Name, chkFlag) == nil { // class member object
+		return true
+	}
+	cb.InternalStack().PopN(1)
+	return false
 }
 
 /*
@@ -261,7 +278,7 @@ func isBuiltin(o types.Object) bool {
 	return false
 }
 
-func compileMember(ctx *blockCtx, lhs int, v ast.Node, name string, flags int) error {
+func compileMember(cb *gogen.CodeBuilder, lhs int, v ast.Node, name string, flags int) error {
 	var mflag gogen.MemberFlag
 	switch {
 	case (flags & clIdentLHS) != 0:
@@ -271,7 +288,7 @@ func compileMember(ctx *blockCtx, lhs int, v ast.Node, name string, flags int) e
 	default:
 		mflag = gogen.MemberFlagMethodAlias
 	}
-	_, err := ctx.cb.Member(name, lhs, mflag, v)
+	_, err := cb.Member(name, lhs, mflag, v)
 	return err
 }
 
@@ -531,7 +548,7 @@ func compileCondExpr(ctx *blockCtx, v *ast.CondExpr) {
 	sigYield := types.NewSignatureType(nil, nil, nil, yieldParams, yieldRets, false)
 	cb.NewClosureWith(sigYield).BodyStart(pkg, condExpr).
 		If(condExpr)
-	compileExpr(ctx, 1, condExpr)
+	compileExpr(ctx, 1, condExpr, clHasSelf)
 	cb.Then(condExpr).
 		If().DefineVarStart(0, nameVal, nameErr).
 		Val(varSelf).MemberVal("XGo_first", 0, v).CallWith(0, 2, 0, v)
@@ -641,7 +658,7 @@ func compileSelectorExpr(ctx *blockCtx, lhs int, v *ast.SelectorExpr, flags int)
 		name = unquote(name)
 		fallthrough
 	default:
-		if err := compileMember(ctx, lhs, v, name, flags); err != nil {
+		if err := compileMember(cb, lhs, v, name, flags); err != nil {
 			if kind, _ := cb.Member("XGo_Elem", 0, 0, v); kind == gogen.MemberInvalid {
 				panic(err) // rethrow original error
 			}
