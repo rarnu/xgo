@@ -24,6 +24,115 @@ import (
 	"golang.org/x/net/html/atom"
 )
 
+func TestClassContains(t *testing.T) {
+	tests := []struct {
+		name      string
+		classAttr string
+		classVal  string
+		want      bool
+	}{
+		// Basic matches
+		{
+			name:      "matches first class",
+			classAttr: "param-required required",
+			classVal:  "param-required",
+			want:      true,
+		},
+		{
+			name:      "matches last class",
+			classAttr: "param-required required",
+			classVal:  "required",
+			want:      true,
+		},
+		{
+			name:      "matches sole class",
+			classAttr: "foo",
+			classVal:  "foo",
+			want:      true,
+		},
+		{
+			name:      "matches middle class",
+			classAttr: "foo bar baz",
+			classVal:  "bar",
+			want:      true,
+		},
+
+		// Partial / substring must not match
+		{
+			name:      "rejects prefix substring",
+			classAttr: "param-required required",
+			classVal:  "param",
+			want:      false,
+		},
+		{
+			name:      "rejects suffix substring",
+			classAttr: "param-required required",
+			classVal:  "required-extra",
+			want:      false,
+		},
+		{
+			name:      "rejects substring in the middle",
+			classAttr: "foo bar baz",
+			classVal:  "ba",
+			want:      false,
+		},
+
+		// Edge cases
+		{
+			name:      "empty classAttr",
+			classAttr: "",
+			classVal:  "foo",
+			want:      false,
+		},
+		{
+			name:      "empty classVal",
+			classAttr: "foo bar",
+			classVal:  "",
+			want:      false,
+		},
+		{
+			name:      "both empty",
+			classAttr: "",
+			classVal:  "",
+			want:      false,
+		},
+		{
+			name:      "leading spaces",
+			classAttr: "   foo bar",
+			classVal:  "foo",
+			want:      true,
+		},
+		{
+			name:      "trailing spaces",
+			classAttr: "foo bar   ",
+			classVal:  "bar",
+			want:      true,
+		},
+		{
+			name:      "multiple spaces between classes",
+			classAttr: "foo   bar   baz",
+			classVal:  "bar",
+			want:      true,
+		},
+		{
+			name:      "class not present",
+			classAttr: "foo bar baz",
+			classVal:  "qux",
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ClassContains(tt.classAttr, tt.classVal)
+			if got != tt.want {
+				t.Errorf("ClassContains(%q, %q) = %v, want %v",
+					tt.classAttr, tt.classVal, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestTextOf(t *testing.T) {
 	cases := []struct {
 		name string
