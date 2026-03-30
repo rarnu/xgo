@@ -103,13 +103,21 @@ func (n *Node) HasAttr(name string) bool {
 
 // HasClass returns true if the node has the specified class in its "class" attribute.
 func (n *Node) HasClass(val string) bool {
-	return ClassContains(n.XGo_Attr__0("class"), val)
+	class, err := n.XGo_Attr__1("class")
+	if err != nil {
+		return false
+	}
+	return ClassContains(class, val)
 }
 
 // IsClass returns true if the node's "class" attribute is exactly equal to the
 // specified value.
 func (n *Node) IsClass(val string) bool {
-	return n.XGo_Attr__0("class") == val
+	class, err := n.XGo_Attr__1("class")
+	if err != nil {
+		return false
+	}
+	return class == val
 }
 
 // XGo_Attr returns the value of the specified attribute from the node.
