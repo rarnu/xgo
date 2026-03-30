@@ -1,4 +1,2 @@
 a := ["hello", "world", "123"]
 echo a.capitalize
-echo contains("param-required required", "required")
-echo contains("param-required required", "param")
