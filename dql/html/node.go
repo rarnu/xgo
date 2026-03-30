@@ -21,6 +21,7 @@ import (
 	"unsafe"
 
 	"github.com/goplus/xgo/dql"
+	"github.com/qiniu/x/stringutil"
 	"golang.org/x/net/html"
 )
 
@@ -99,6 +100,17 @@ func (n *Node) HasAttr(name string) bool {
 		}
 	}
 	return false
+}
+
+// HasClass returns true if the node has the specified class in its "class" attribute.
+func (n *Node) HasClass(val string) bool {
+	return stringutil.Contains(n.XGo_Attr__0("class"), val)
+}
+
+// IsClass returns true if the node's "class" attribute is exactly equal to the
+// specified value.
+func (n *Node) IsClass(val string) bool {
+	return n.XGo_Attr__0("class") == val
 }
 
 // XGo_Attr returns the value of the specified attribute from the node.
