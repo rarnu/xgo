@@ -122,7 +122,7 @@ func (p *Importer) PkgHash(pkgPath string, self bool) string {
 		}
 	}
 	if isPkgInMod(pkgPath, xgoMod) || isPkgInMod(pkgPath, xMod) {
-		return cache.HashSkip
+		return p.xgo.Version
 	}
 	log.Println("PkgHash: unexpected package -", pkgPath)
 	return cache.HashInvalid
